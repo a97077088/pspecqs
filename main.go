@@ -1,4 +1,4 @@
-package main
+package pspecqs
 
 import (
 	"bytes"
@@ -10,27 +10,50 @@ import (
 	"strings"
 	"test.com/a/grequests"
 )
-
-func CasServer_captcha(session *grequests.Session)error{
+func CasServer_login_index(session *grequests.Session)(string,string,error){
 	cli:=grequests.NewCli(session)
-	r,err:=cli.Get("http://psp.e-cqs.cn/casServer/captcha.jpg?0.5466787858743882",nil)
+	r,err:=cli.Get("http://psp.e-cqs.cn/casServer/login?service=http://psp.e-cqs.cn/InspSystemV11/reservation/reservationQuery.jsp&code=90000&tacsaccess=1&flag=false",&grequests.RequestOptions{
+		Headers: map[string]string{
+			"Upgrade-Insecure-Requests":"1",
+		},
+	})
 	if err != nil {
-		return err
-	}
-	r.DownloadToFile("test.png")
-	return nil
-}
-func CasServer_login(username,password,authcode string,session *grequests.Session)(string,error){
-	cli:=grequests.NewCli(session)
-	r,err:=cli.Get("http://psp.e-cqs.cn/casServer/login?service=http://psp.e-cqs.cn/InspSystemV11/reservation/reservationQuery.jsp&code=90000&tacsaccess=1&flag=false",&grequests.RequestOptions{})
-	if err != nil {
-		return "", err
+		return "","", err
 	}
 	gq,err:=goquery.NewDocumentFromReader(bytes.NewReader(r.Bytes()))
 	if err != nil {
-		return "",err
+		return "","",err
 	}
 	execution,_:=gq.Find(".loginBtn input[name=execution]").Attr("value")
+	ul,_:=url.Parse("http://psp.e-cqs.cn/casServer/")
+	cks:=cli.HTTPClient.Jar.Cookies(ul)
+	cookies:=strings.Builder{}
+	for idx, it := range cks  {
+		if idx!=0{
+			cookies.WriteString(";")
+		}
+		cookies.WriteString(fmt.Sprintf("%s=%s",it.Name,it.Value))
+	}
+	return execution,cookies.String(),nil
+}
+func CasServer_captcha(incks string,session *grequests.Session)(string,[]byte,error){
+	cli:=grequests.NewCli(session)
+	r,err:=cli.Get("http://psp.e-cqs.cn/casServer/captcha.jpg?0.5466787858743882",&grequests.RequestOptions{
+		Headers: map[string]string{
+			"Cookie":incks,
+			"Origin":"http://psp.e-cqs.cn",
+			"Upgrade-Insecure-Requests":"1",
+			"Referer":"http://psp.e-cqs.cn/casServer/login?service=http://psp.e-cqs.cn/InspSystemV11/reservation/reservationQuery.jsp&code=90000&tacsaccess=1&flag=false",
+		},
+	})
+	if err != nil {
+		return "",nil,err
+	}
+	bt:=r.Bytes()
+	return incks,bt,nil
+}
+func CasServer_login(incks,execution,username,password,authcode string,session *grequests.Session)(string,error){
+	cli:=grequests.NewCli(session)
 	reqdata:=map[string]string{
 		"usertype":"1",
 		"strongPassword":"1",
@@ -41,17 +64,20 @@ func CasServer_login(username,password,authcode string,session *grequests.Sessio
 		"_eventId":"submit",
 		"submit":"",
 	}
-	r,err=cli.Post("http://psp.e-cqs.cn/casServer/login?service=http://psp.e-cqs.cn/InspSystemV11/reservation/reservationQuery.jsp&code=90000&tacsaccess=1&flag=false",&grequests.RequestOptions{
+	r,err:=cli.Post("http://psp.e-cqs.cn/casServer/login?service=http://psp.e-cqs.cn/InspSystemV11/reservation/reservationQuery.jsp&code=90000&tacsaccess=1&flag=false",&grequests.RequestOptions{
+		Headers: map[string]string{
+			"Cookie":incks,
+		},
 		Data: reqdata,
 	})
 	if err != nil {
 		return "", err
 	}
-	gq,err=goquery.NewDocumentFromReader(bytes.NewReader(r.Bytes()))
+	gq,err:=goquery.NewDocumentFromReader(bytes.NewReader(r.Bytes()))
 	if err != nil {
 		return "",err
 	}
-	if gq.Find("html head title").Text()!="检定预约受理"{
+	if gq.Find("html head title").Text()!="检定预约受理"&&strings.Contains(r.String(),"http://psp.e-cqs.cn/casServer/login?service=")==false{
 		errorsmsg:=gq.Find(".errors#msg").Text()
 		if errorsmsg!=""{
 			return "",errors.New(errorsmsg)
@@ -69,7 +95,7 @@ func CasServer_login(username,password,authcode string,session *grequests.Sessio
 	}
 	return cookies.String(),nil
 }
-func GetIntruInfoByReservationId(params string,filters *FilterSets,session *grequests.Session)([]*InspAppointmentIntruInfoUser,error){
+func GetIntruInfoByReservationId(incks string,params string,filters *FilterSets,session *grequests.Session)([]*InspAppointmentIntruInfoUser,error){
 	cli:=grequests.NewCli(session)
 	ft:=NewFilterSets()
 	if filters!=nil{
@@ -94,6 +120,7 @@ func GetIntruInfoByReservationId(params string,filters *FilterSets,session *greq
 		Params: reqquery,
 		Data: reqdata,
 		Headers: map[string]string{
+			"Cookie":incks,
 			"Content-Type":"application/x-www-form-urlencoded; charset=UTF-8",
 			"X-Requested-With":"XMLHttpRequest",
 		},
@@ -166,7 +193,7 @@ func GetIntruInfoByReservationId(params string,filters *FilterSets,session *greq
 	}
 	return users,nil
 }
-func GetAppointmentInfoCount(filters *FilterSets,session *grequests.Session)(int,error){
+func GetAppointmentInfoCount(incks string,filters *FilterSets,session *grequests.Session)(int,error){
 	cli:=grequests.NewCli(session)
 	ft:=NewFilterSets()
 	if filters!=nil{
@@ -191,6 +218,7 @@ func GetAppointmentInfoCount(filters *FilterSets,session *grequests.Session)(int
 		Params: reqquery,
 		Data: reqdata,
 		Headers: map[string]string{
+			"Cookie":incks,
 			"Content-Type":"application/x-www-form-urlencoded; charset=UTF-8",
 			"X-Requested-With":"XMLHttpRequest",
 		},
@@ -213,7 +241,7 @@ func GetAppointmentInfoCount(filters *FilterSets,session *grequests.Session)(int
 	totalcount:=rjs.Get("transferableProperties","fspParameter","pagination","totalCount").ToInt()
 	return totalcount,nil
 }
-func GetAppointmentInfo(rows int,filters *FilterSets,session *grequests.Session)([]*InspAppointmentInfoVoUser,error){
+func GetAppointmentInfo(incks string,rows int,filters *FilterSets,session *grequests.Session)([]*InspAppointmentInfoVoUser,error){
 	cli:=grequests.NewCli(session)
 	ft:=NewFilterSets()
 	if filters!=nil{
@@ -238,6 +266,7 @@ func GetAppointmentInfo(rows int,filters *FilterSets,session *grequests.Session)
 		Params: reqquery,
 		Data: reqdata,
 		Headers: map[string]string{
+			"Cookie":incks,
 			"Content-Type":"application/x-www-form-urlencoded; charset=UTF-8",
 			"X-Requested-With":"XMLHttpRequest",
 		},
@@ -285,35 +314,3 @@ func GetAppointmentInfo(rows int,filters *FilterSets,session *grequests.Session)
 	return users,nil
 }
 
-func main() {
-	err:=func() error{
-		cli:=grequests.NewSession(&grequests.RequestOptions{
-			Headers: map[string]string{
-				"Cookie":"JSESSIONID=0001xyMQTc39h6d3U1n8CCRq4Zw:-G00EC;",
-			},
-		})
-		err:=CasServer_captcha(cli)
-		if err != nil {
-			return err
-		}
-		fmt.Println("input ca:",)
-		var ca string
-		fmt.Scanf("%s",&ca)
-		cks,err:=CasServer_login("jinzhaihongzhi","Hz01200017=",ca,cli)
-		if err != nil {
-			return err
-		}
-		_=cks
-		users,err:=GetIntruInfoByReservationId("7BB017210AE6491417B2861C81A25459",nil,cli)
-		if err != nil {
-			return err
-		}
-		for _, it := range users {
-			fmt.Println(it)
-		}
-	    return nil
-	}()
-	if err!=nil{
-	    fmt.Println(err)
-	}
-}
