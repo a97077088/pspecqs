@@ -225,10 +225,10 @@ func GetAppointmentInfoCount(incks string,filters *FilterSets,session *grequests
 		RedirectLimit: -1,
 	})
 	if err != nil {
-		if r.StatusCode==302{
-			return 0,errors.New("登录状态错误")
-		}
 		return 0,err
+	}
+	if r.StatusCode==302{
+		return 0,errors.New("登录状态错误")
 	}
 	rjs,err:=r.ToJson()
 	if err != nil {
@@ -273,10 +273,11 @@ func GetAppointmentInfo(incks string,rows int,filters *FilterSets,session *grequ
 		RedirectLimit: -1,
 	})
 	if err != nil {
-		if r.StatusCode==302{
-			return nil,errors.New("登录状态错误")
-		}
+
 		return nil,err
+	}
+	if r.StatusCode==302{
+		return nil,errors.New("登录状态错误")
 	}
 	rjs,err:=r.ToJson()
 	if err != nil {
@@ -309,6 +310,7 @@ func GetAppointmentInfo(incks string,rows int,filters *FilterSets,session *grequ
 			OperactionTime: it.Get("operationTime","value").ToString(),
 			SendStatus: it.Get("sendStatus").ToString(),
 		}
+		val.SetUnique(i)
 		users=append(users,&val)
 	}
 	return users,nil

@@ -3,6 +3,7 @@ package pspecqs
 import "time"
 
 const(
+	FilterType_CONTAIN="CONTAIN"
 	FilterType_EQUAL="EQUAL"
 	FilterType_GREAT_EQUAL_THAN="GREAT_EQUAL_THAN"
 	FilterType_DATE_LESS_EQUAL_THAN="DATE_LESS_EQUAL_THAN"
