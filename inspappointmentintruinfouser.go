@@ -59,7 +59,9 @@ type InspAppointmentIntruInfoUser struct {
 	AppointmentId string
 	ReservationId string
 }
-
+func (U *InspAppointmentIntruInfoUser) Unique() interface{} {
+	return U.AppUser.Unique()
+}
 
 func NewInspAppointmentIntruInfoUser()*InspAppointmentIntruInfoUser{
 	u:=&InspAppointmentIntruInfoUser{}
