@@ -77,7 +77,7 @@ func CasServer_login(incks,execution,username,password,authcode string,session *
 	if err != nil {
 		return "",err
 	}
-	if gq.Find("html head title").Text()!="检定预约受理"&&strings.Contains(r.String(),"http://psp.e-cqs.cn/casServer/login?service=")==false{
+	if gq.Find("html title").First().Text()!="检定预约受理"&&strings.Contains(r.String(),"http://psp.e-cqs.cn/casServer/login?service=")==false{
 		errorsmsg:=gq.Find(".errors#msg").Text()
 		if errorsmsg!=""{
 			return "",errors.New(errorsmsg)
